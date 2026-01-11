@@ -67,11 +67,11 @@ def load_translate_model():
     translate_model = MarianMTModel.from_pretrained(
         TRANSLATE_MODEL_PATH,
         torch_dtype=torch.float16,
-        device_map="auto",
         local_files_only=True
-    )
+    ).to("cuda")
+
     translate_model.eval()
-    log("TRANSLATION model loaded")
+    log("TRANSLATION model loaded on cuda")
 
 # -------------------------------------------------
 # Summarize all pages together
