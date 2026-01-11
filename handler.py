@@ -10,13 +10,13 @@ from transformers import (
 )
 
 # -------------------------------------------------
-# Logging helper
+# Logging
 # -------------------------------------------------
 def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 # -------------------------------------------------
-# Model paths
+# Paths
 # -------------------------------------------------
 SUMMARY_MODEL_PATH = "/models/hf/t5-summary"
 TRANSLATE_MODEL_PATH = "/models/hf/marian-ru-en"
@@ -47,6 +47,7 @@ def load_summary_model():
         device_map="auto",
         local_files_only=True
     )
+
     summary_model.eval()
     log("SUMMARY model loaded")
 
@@ -74,11 +75,15 @@ def load_translate_model():
     log("TRANSLATION model loaded on cuda")
 
 # -------------------------------------------------
-# Summarize all pages together
+# Summarize ALL pages together (FORCED ENGLISH)
 # -------------------------------------------------
 def summarize_all_pages(pages):
     full_text = "\n\n".join(p["text"] for p in pages)
-    prompt = "summarize:\n" + full_text
+
+    prompt = (
+        "summarize the following Russian legal document in English:\n"
+        + full_text
+    )
 
     inputs = summary_tokenizer(
         prompt,
@@ -97,20 +102,36 @@ def summarize_all_pages(pages):
     return summary_tokenizer.decode(output[0], skip_special_tokens=True)
 
 # -------------------------------------------------
-# Translate single page (format preserved)
+# Translate page with CHUNKING (NO TRUNCATION)
 # -------------------------------------------------
 def translate_text(text):
-    inputs = translate_tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        max_length=1024
-    ).to(translate_model.device)
+    blocks = text.split("\n\n")
+    translated_blocks = []
 
-    with torch.no_grad():
-        output = translate_model.generate(**inputs)
+    for block in blocks:
+        if not block.strip():
+            translated_blocks.append(block)
+            continue
 
-    return translate_tokenizer.decode(output[0], skip_special_tokens=True)
+        inputs = translate_tokenizer(
+            block,
+            return_tensors="pt",
+            truncation=True,
+            max_length=512
+        ).to(translate_model.device)
+
+        with torch.no_grad():
+            output = translate_model.generate(
+                **inputs,
+                max_new_tokens=512,
+                do_sample=False
+            )
+
+        translated_blocks.append(
+            translate_tokenizer.decode(output[0], skip_special_tokens=True)
+        )
+
+    return "\n\n".join(translated_blocks)
 
 # -------------------------------------------------
 # RunPod handler
