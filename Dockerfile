@@ -1,40 +1,64 @@
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+import os
+import torch
+import runpod
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-ENV DEBIAN_FRONTEND=noninteractive
+# =========================
+# HARD OFFLINE ASSERTS
+# =========================
+assert os.environ.get("HF_HUB_OFFLINE") == "1"
+assert os.environ.get("TRANSFORMERS_OFFLINE") == "1"
 
-RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+MODEL_PATH = "/models/hf/utrobinmv/t5"
 
-RUN pip install --no-cache-dir \
-    torch \
-    transformers \
-    huggingface_hub \
-    runpod \
-    pillow
-
-# HF OFFLINE CACHE
-ENV HF_HOME=/models/hf
-ENV TRANSFORMERS_CACHE=/models/hf
-ENV HF_HUB_CACHE=/models/hf
-ENV HF_HUB_ENABLE_HF_TRANSFER=0
-ENV HF_HUB_DISABLE_XET=1
-ENV HF_DATASETS_OFFLINE=1
-ENV TRANSFORMERS_OFFLINE=1
-
-# Pre-download model
-RUN python3 - <<EOF
-from huggingface_hub import snapshot_download
-snapshot_download(
-    repo_id="utrobinmv/t5_summary_en_ru_zh_large_2048",
-    local_dir="/models/hf/utrobinmv/t5",
-    local_dir_use_symlinks=False
+# =========================
+# Load tokenizer & model
+# =========================
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_PATH,
+    local_files_only=True
 )
-EOF
 
-WORKDIR /app
-COPY handler.py .
+model = AutoModelForSeq2SeqLM.from_pretrained(
+    MODEL_PATH,
+    torch_dtype=torch.float16,
+    device_map="auto",
+    local_files_only=True
+)
 
-CMD ["python3", "handler.py"]
+model.eval()
+
+# =========================
+# Translation function
+# =========================
+def translate_text(text: str) -> str:
+    prompt = "translate Russian to English:\n" + text
+
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=2048
+    ).to(model.device)
+
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=2048,
+            do_sample=False
+        )
+
+    return tokenizer.decode(output[0], skip_special_tokens=True)
+
+# =========================
+# RunPod handler
+# =========================
+def handler(event):
+    pages = event["input"]["pages"]
+
+    for page in pages:
+        page["text"] = translate_text(page["text"])
+
+    return {"pages": pages}
+
+runpod.serverless.start({"handler": handler})
