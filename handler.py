@@ -1,9 +1,19 @@
-import runpod
+import os
 import torch
+import runpod
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# =========================
+# HARD OFFLINE ASSERTS
+# =========================
+assert os.environ.get("HF_HUB_OFFLINE") == "1"
+assert os.environ.get("TRANSFORMERS_OFFLINE") == "1"
 
 MODEL_PATH = "/models/hf/utrobinmv/t5"
 
+# =========================
+# Load tokenizer & model
+# =========================
 tokenizer = AutoTokenizer.from_pretrained(
     MODEL_PATH,
     local_files_only=True
@@ -16,6 +26,11 @@ model = AutoModelForSeq2SeqLM.from_pretrained(
     local_files_only=True
 )
 
+model.eval()
+
+# =========================
+# Translation function
+# =========================
 def translate_text(text: str) -> str:
     prompt = "translate Russian to English:\n" + text
 
@@ -35,6 +50,9 @@ def translate_text(text: str) -> str:
 
     return tokenizer.decode(output[0], skip_special_tokens=True)
 
+# =========================
+# RunPod handler
+# =========================
 def handler(event):
     pages = event["input"]["pages"]
 
