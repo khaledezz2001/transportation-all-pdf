@@ -78,7 +78,8 @@ def load_translate_model():
     log("TRANSLATION model loaded on cuda")
 
 # =====================================================
-# Detect layout / table / separator lines
+# Detect layout-only lines (tables, separators)
+# OPTION A: tables are preserved, not translated
 # =====================================================
 def is_layout_line(line: str) -> bool:
     if "|" in line:
@@ -120,13 +121,16 @@ def translate_text(text: str) -> str:
     return "\n".join(out_lines)
 
 # =====================================================
-# Summarize ALL pages together (T5)
+# Summarize ALL pages together (PROFESSIONAL LEGAL STYLE)
 # =====================================================
 def summarize_all_pages(pages):
     full_text = "\n\n".join(p["text"] for p in pages)
 
     prompt = (
-        "summarize the following Russian legal document:\n"
+        "Provide a concise, professional legal summary in English of the "
+        "following Russian contract. The summary should identify the parties, "
+        "the subject matter, key obligations, payment terms, duration, and "
+        "liability, without copying text verbatim:\n\n"
         + full_text
     )
 
