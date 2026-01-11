@@ -3,34 +3,34 @@ import torch
 import runpod
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-# =========================
-# HARD OFFLINE ASSERTS
-# =========================
-assert os.environ.get("HF_HUB_OFFLINE") == "1"
-assert os.environ.get("TRANSFORMERS_OFFLINE") == "1"
-
 MODEL_PATH = "/models/hf/utrobinmv/t5"
 
-# =========================
-# Load tokenizer & model
-# =========================
-tokenizer = AutoTokenizer.from_pretrained(
-    MODEL_PATH,
-    local_files_only=True
-)
+tokenizer = None
+model = None
 
-model = AutoModelForSeq2SeqLM.from_pretrained(
-    MODEL_PATH,
-    torch_dtype=torch.float16,
-    device_map="auto",
-    local_files_only=True
-)
+def load_model():
+    global tokenizer, model
 
-model.eval()
+    if model is not None:
+        return
 
-# =========================
-# Translation function
-# =========================
+    print("Loading model...")
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_PATH,
+        local_files_only=True
+    )
+
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        MODEL_PATH,
+        torch_dtype=torch.float16,
+        device_map="auto",
+        local_files_only=True
+    )
+
+    model.eval()
+    print("Model loaded successfully.")
+
 def translate_text(text: str) -> str:
     prompt = "translate Russian to English:\n" + text
 
@@ -50,10 +50,9 @@ def translate_text(text: str) -> str:
 
     return tokenizer.decode(output[0], skip_special_tokens=True)
 
-# =========================
-# RunPod handler
-# =========================
 def handler(event):
+    load_model()
+
     pages = event["input"]["pages"]
 
     for page in pages:
