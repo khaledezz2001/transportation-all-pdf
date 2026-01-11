@@ -17,9 +17,11 @@ def load_model():
     print("Loading model...")
 
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_PATH,
-        local_files_only=True
-    )
+    MODEL_PATH,
+    local_files_only=True,
+    use_fast=False
+     )
+
 
     model = AutoModelForSeq2SeqLM.from_pretrained(
         MODEL_PATH,
