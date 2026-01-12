@@ -36,7 +36,6 @@ def load_summary_model():
         return
 
     log("Loading SUMMARY model (T5)")
-
     summary_tokenizer = AutoTokenizer.from_pretrained(
         SUMMARY_MODEL_PATH,
         local_files_only=True,
@@ -62,7 +61,6 @@ def load_translate_model():
         return
 
     log("Loading TRANSLATION model (Marian)")
-
     translate_tokenizer = MarianTokenizer.from_pretrained(
         TRANSLATE_MODEL_PATH,
         local_files_only=True
@@ -78,28 +76,66 @@ def load_translate_model():
     log("TRANSLATION model loaded on cuda")
 
 # =====================================================
-# Detect layout-only lines (tables, separators)
-# OPTION A: tables are preserved, not translated
+# Detect pure separator lines (---, ___)
 # =====================================================
 def is_layout_line(line: str) -> bool:
-    if "|" in line:
-        return True
-    if re.match(r"^[\-\._\s]{5,}$", line):
-        return True
-    return False
+    return bool(re.match(r"^[\-\._\s]{5,}$", line))
 
 # =====================================================
-# Translate text (layout-aware, line-by-line)
+# Translate text (TABLES INCLUDED, STRUCTURE SAFE)
 # =====================================================
 def translate_text(text: str) -> str:
     lines = text.split("\n")
     out_lines = []
 
     for line in lines:
-        if not line.strip() or is_layout_line(line):
+        # Empty line
+        if not line.strip():
             out_lines.append(line)
             continue
 
+        # Separator line
+        if is_layout_line(line):
+            out_lines.append(line)
+            continue
+
+        # -------- TABLE ROW --------
+        if "|" in line:
+            cells = line.split("|")
+            new_cells = []
+
+            for cell in cells:
+                cell_text = cell.strip()
+
+                # Empty cell
+                if not cell_text:
+                    new_cells.append(cell)
+                    continue
+
+                inputs = translate_tokenizer(
+                    cell_text,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=128
+                ).to(translate_model.device)
+
+                with torch.no_grad():
+                    output = translate_model.generate(
+                        **inputs,
+                        max_new_tokens=128,
+                        do_sample=False
+                    )
+
+                translated = translate_tokenizer.decode(
+                    output[0], skip_special_tokens=True
+                )
+
+                new_cells.append(f" {translated} ")
+
+            out_lines.append("|".join(new_cells))
+            continue
+
+        # -------- NORMAL TEXT LINE --------
         inputs = translate_tokenizer(
             line,
             return_tensors="pt",
@@ -121,16 +157,15 @@ def translate_text(text: str) -> str:
     return "\n".join(out_lines)
 
 # =====================================================
-# Summarize ALL pages together (PROFESSIONAL LEGAL STYLE)
+# Summarize ALL pages together (professional legal style)
 # =====================================================
 def summarize_all_pages(pages):
     full_text = "\n\n".join(p["text"] for p in pages)
 
     prompt = (
         "Provide a concise, professional legal summary in English of the "
-        "following Russian contract. The summary should identify the parties, "
-        "the subject matter, key obligations, payment terms, duration, and "
-        "liability, without copying text verbatim:\n\n"
+        "following Russian contract. Identify the parties, subject matter, "
+        "key obligations, payment terms, duration, and liability:\n\n"
         + full_text
     )
 
@@ -164,9 +199,7 @@ def handler(event):
     # ---- Summary ----
     log("Creating summary")
     raw_summary = summarize_all_pages(pages)
-
-    # Ensure summary is English
-    summary = translate_text(raw_summary)
+    summary = translate_text(raw_summary)  # ensure English
 
     # ---- Translation ----
     log("Translating pages")
@@ -184,3 +217,4 @@ def handler(event):
 # Start RunPod serverless
 # =====================================================
 runpod.serverless.start({"handler": handler})
+
