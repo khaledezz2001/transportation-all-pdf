@@ -94,7 +94,12 @@ def translate_text(text: str) -> str:
             out_lines.append(line)
             continue
 
-        # Separator line
+        # FULL separator row (even with pipes) → keep EXACT
+        if re.match(r"^\|\s*[-\s_\.]+\|\s*[-\s_\.]+\|\s*$", line):
+            out_lines.append(line)
+            continue
+
+        # Pure separator (no pipes)
         if is_layout_line(line):
             out_lines.append(line)
             continue
@@ -107,8 +112,8 @@ def translate_text(text: str) -> str:
             for cell in cells:
                 cell_text = cell.strip()
 
-                # Empty cell
-                if not cell_text:
+                # Empty or separator-only cell → keep as-is
+                if not cell_text or re.match(r"^[-\s_\.]+$", cell_text):
                     new_cells.append(cell)
                     continue
 
