@@ -89,12 +89,28 @@ def translate_text(text: str) -> str:
     out_lines = []
 
     for line in lines:
+        stripped = line.strip()
+
+        # =================================================
+        # 🔒 HARD GUARDS — DO NOT TRANSLATE MEANINGLESS INPUT
+        # =================================================
+
         # Empty line
-        if not line.strip():
+        if not stripped:
             out_lines.append(line)
             continue
 
-        # FULL separator row (even with pipes) → keep EXACT
+        # Bullet / symbol-only line (•, -, *, etc.)
+        if re.match(r"^[\u2022•\-\*\u00B7]+$", stripped):
+            out_lines.append(line)
+            continue
+
+        # Very low linguistic content → skip
+        if len(re.findall(r"[A-Za-zА-Яа-я]", stripped)) < 2:
+            out_lines.append(line)
+            continue
+
+        # Full separator row (tables)
         if re.match(r"^\|\s*[-\s_\.]+\|\s*[-\s_\.]+\|\s*$", line):
             out_lines.append(line)
             continue
@@ -104,7 +120,9 @@ def translate_text(text: str) -> str:
             out_lines.append(line)
             continue
 
-        # -------- TABLE ROW --------
+        # =================================================
+        # TABLE ROW
+        # =================================================
         if "|" in line:
             cells = line.split("|")
             new_cells = []
@@ -112,8 +130,13 @@ def translate_text(text: str) -> str:
             for cell in cells:
                 cell_text = cell.strip()
 
-                # Empty or separator-only cell → keep as-is
+                # Skip empty / separator cells
                 if not cell_text or re.match(r"^[-\s_\.]+$", cell_text):
+                    new_cells.append(cell)
+                    continue
+
+                # Skip non-linguistic cells
+                if len(re.findall(r"[A-Za-zА-Яа-я]", cell_text)) < 2:
                     new_cells.append(cell)
                     continue
 
@@ -140,7 +163,9 @@ def translate_text(text: str) -> str:
             out_lines.append("|".join(new_cells))
             continue
 
-        # -------- NORMAL TEXT LINE --------
+        # =================================================
+        # NORMAL TEXT LINE
+        # =================================================
         inputs = translate_tokenizer(
             line,
             return_tensors="pt",
@@ -162,21 +187,25 @@ def translate_text(text: str) -> str:
     return "\n".join(out_lines)
 
 # =====================================================
-# Summarize ALL pages together (professional legal style)
+# Summarize ALL pages together
 # =====================================================
 def summarize_all_pages(pages):
-    full_text = "\n\n".join(p["text"] for p in pages)
+    full_text = "\n\n".join(
+        p["text"] for p in pages
+        if len(re.findall(r"[A-Za-zА-Яа-я]", p["text"])) > 5
+    )
+
+    if not full_text.strip():
+        return ""
 
     prompt = (
-    "Provide a concise, professional legal summary in English (maximum 500 characters) of the "
-    "following Russian contract. The summary MUST explicitly name the parties, "
-    "clearly state the subject matter, list the main obligations of each party, "
-    "describe payment terms, contract duration, and liability provisions. "
-    "Do NOT use generic phrases or meta-descriptions. Base the summary only on the text below:\n\n"
-    + full_text
-       )
-
-
+        "Provide a concise, professional legal summary in English (maximum 500 characters) "
+        "of the following Russian contract. The summary MUST explicitly name the parties, "
+        "clearly state the subject matter, list the main obligations of each party, "
+        "describe payment terms, contract duration, and liability provisions. "
+        "Do NOT use generic phrases or meta-descriptions. Base the summary only on the text below:\n\n"
+        + full_text
+    )
 
     inputs = summary_tokenizer(
         prompt,
@@ -208,7 +237,7 @@ def handler(event):
     # ---- Summary ----
     log("Creating summary")
     raw_summary = summarize_all_pages(pages)
-    summary = translate_text(raw_summary)  # ensure English
+    summary = translate_text(raw_summary) if raw_summary else ""
 
     # ---- Translation ----
     log("Translating pages")
@@ -226,4 +255,3 @@ def handler(event):
 # Start RunPod serverless
 # =====================================================
 runpod.serverless.start({"handler": handler})
-
