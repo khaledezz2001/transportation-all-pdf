@@ -168,11 +168,12 @@ def summarize_all_pages(pages):
     full_text = "\n\n".join(p["text"] for p in pages)
 
     prompt = (
-        "Provide a concise, professional legal summary in English of the "
-        "following Russian contract. Identify the parties, subject matter, "
-        "key obligations, payment terms, duration, and liability:\n\n"
-        + full_text
-    )
+    "Provide a concise, professional legal summary in English (maximum 500 characters) of the "
+    "following Russian contract. Identify the parties, subject matter, "
+    "key obligations, payment terms, duration, and liability:\n\n"
+    + full_text
+     )
+
 
     inputs = summary_tokenizer(
         prompt,
