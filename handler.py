@@ -272,13 +272,24 @@ def summarize_all_pages(pages):
         return ""
 
     prompt = (
-        "Provide a concise, professional legal summary in English (maximum 500 words) "
-        "of the following Russian contract. The summary MUST explicitly name the parties, "
-        "clearly state the subject matter, list the main obligations of each party, "
-        "describe payment terms, contract duration, and liability provisions. "
-        "Do NOT use generic phrases or meta-descriptions. Base the summary only on the text below:\n\n"
-        + full_text
-    )
+    "Extract and list factual legal information from the contract below. "
+    "Do not summarize abstractly. "
+    "Use full sentences. "
+    "Include all names, dates, amounts, percentages, and penalties exactly as written. "
+    "If a section exists, extract it.\n\n"
+    "Required sections:\n"
+    "1. Parties\n"
+    "2. Subject matter\n"
+    "3. Services provided\n"
+    "4. Total price and currency\n"
+    "5. Payment terms\n"
+    "6. Contract duration\n"
+    "7. Liability and penalties\n"
+    "8. Dispute resolution\n\n"
+    "Contract text:\n\n"
+    + full_text
+     )
+
 
     inputs = summary_tokenizer(
         prompt,
