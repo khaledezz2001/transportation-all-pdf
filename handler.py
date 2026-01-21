@@ -199,7 +199,7 @@ def summarize_all_pages(pages):
         return ""
 
     prompt = (
-        "Provide a concise, professional legal summary in English (maximum 500 characters) "
+        "Provide a concise, professional legal summary in English (maximum 500 words) "
         "of the following Russian contract. The summary MUST explicitly name the parties, "
         "clearly state the subject matter, list the main obligations of each party, "
         "describe payment terms, contract duration, and liability provisions. "
