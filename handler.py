@@ -189,11 +189,84 @@ def translate_text(text: str) -> str:
 # =====================================================
 # Summarize ALL pages together
 # =====================================================
+def clean_ocr_noise(text: str) -> str:
+   
+    cleaned_lines = []
+    seen = set()
+
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+
+        # -------------------------------
+        # Пустые строки
+        # -------------------------------
+        if not line:
+            continue
+
+        upper = line.upper()
+
+        # -------------------------------
+        # Подписи, свидетели, boilerplate
+        # -------------------------------
+        if upper.startswith("EXECUTED AS A DEED"):
+            continue
+        if upper.startswith("SIGNATURE OF WITNESS"):
+            continue
+        if upper.startswith("IN THE PRESIDENCY OF"):
+            continue
+        if re.match(r"^NAME:\s*$", upper):
+            continue
+        if re.match(r"^ADDRESS:\s*$", upper):
+            continue
+
+        # -------------------------------
+        # OCR / редакторский мусор
+        # -------------------------------
+        if "SYNC, CORRECTED BY" in upper:
+            continue
+        if upper.startswith("==") and upper.endswith("=="):
+            continue
+
+        # -------------------------------
+        # Плейсхолдеры
+        # -------------------------------
+        if line in {"[-]", "[ ]", "[__]", "_____"}:
+            continue
+
+        # -------------------------------
+        # Линии разметки (----, ____ и т.п.)
+        # -------------------------------
+        if re.match(r"^[\-\._\s]{5,}$", line):
+            continue
+
+        # -------------------------------
+        # Очень низкая языковая нагрузка
+        # (оставляем заголовки, убираем мусор)
+        # -------------------------------
+        if len(re.findall(r"[A-Za-zА-Яа-я]", line)) < 5:
+            continue
+
+        # -------------------------------
+        # Удаление дубликатов строк
+        # -------------------------------
+        key = upper
+        if key in seen:
+            continue
+        seen.add(key)
+
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
+
+
 def summarize_all_pages(pages):
     full_text = "\n\n".join(
-        p["text"] for p in pages
-        if len(re.findall(r"[A-Za-zА-Яа-я]", p["text"])) > 5
-    )
+        cleaned
+        for p in pages
+        if (cleaned := clean_ocr_noise(p["text"]))
+        and len(re.findall(r"[A-Za-zА-Яа-я]", cleaned)) > 20
+     )
+
 
     if not full_text.strip():
         return ""
