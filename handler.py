@@ -272,21 +272,7 @@ def summarize_all_pages(pages):
         return ""
 
     prompt = (
-    "Extract and list factual legal information from the contract below. "
-    "Do not summarize abstractly. "
-    "Use full sentences. "
-    "Include all names, dates, amounts, percentages, and penalties exactly as written. "
-    "If a section exists, extract it.\n\n"
-    "Required sections:\n"
-    "1. Parties\n"
-    "2. Subject matter\n"
-    "3. Services provided\n"
-    "4. Total price and currency\n"
-    "5. Payment terms\n"
-    "6. Contract duration\n"
-    "7. Liability and penalties\n"
-    "8. Dispute resolution\n\n"
-    "Contract text:\n\n"
+    "Rewrite the contract below in English. IMPORTANT: - This is NOT a summary. - You MUST restate ALL factual information in full. - Output MUST be at least 500 words. - Expand each section into detailed legal sentences.- Do NOT omit names, dates, addresses, amounts, percentages, or penalties.- If information appears in tables, convert it to full sentences.Write each required section as a separate heading."
     + full_text
      )
 
